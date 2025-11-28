@@ -132,10 +132,18 @@ export class LiveSessionManager {
   private nextStartTime: number = 0;
   private sources = new Set<AudioBufferSourceNode>();
   
-  private onStatusChange: (status: { isConnected: boolean; error: string | null }) => void;
+  private currentInputTranscription = '';
+  private currentOutputTranscription = '';
 
-  constructor(onStatusChange: (status: { isConnected: boolean; error: string | null }) => void) {
+  private onStatusChange: (status: { isConnected: boolean; error: string | null }) => void;
+  private onTranscript: (role: 'user' | 'model', text: string, isFinal: boolean) => void;
+
+  constructor(
+    onStatusChange: (status: { isConnected: boolean; error: string | null }) => void,
+    onTranscript: (role: 'user' | 'model', text: string, isFinal: boolean) => void
+  ) {
     this.onStatusChange = onStatusChange;
+    this.onTranscript = onTranscript;
   }
 
   async connect() {
@@ -154,7 +162,9 @@ export class LiveSessionManager {
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
             },
-            systemInstruction: "You are a helpful, patient English tutor for an Arabic speaker. Speak clearly and simply. Correct their grammar if they make mistakes, but be encouraging. Do not speak Arabic unless explaining a very difficult concept."
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            systemInstruction: "You are a helpful, patient English tutor for an Arabic speaker. Speak clearly and simply. If the user makes pronunciation or grammar errors, gently correct them in your response. Ensure your response text is formatted clearly."
         },
         callbacks: {
           onopen: () => {
@@ -163,13 +173,38 @@ export class LiveSessionManager {
             this.startAudioStreaming(stream);
           },
           onmessage: async (message: LiveServerMessage) => {
+             // Handle Audio
              const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (base64Audio && this.outputAudioContext) {
                  this.handleAudioOutput(base64Audio);
              }
 
+             // Handle Transcription
+             if (message.serverContent?.outputTranscription) {
+               const text = message.serverContent.outputTranscription.text;
+               this.currentOutputTranscription += text;
+               this.onTranscript('model', this.currentOutputTranscription, false);
+             } else if (message.serverContent?.inputTranscription) {
+               const text = message.serverContent.inputTranscription.text;
+               this.currentInputTranscription += text;
+               this.onTranscript('user', this.currentInputTranscription, false);
+             }
+
+             if (message.serverContent?.turnComplete) {
+               if (this.currentInputTranscription) {
+                 this.onTranscript('user', this.currentInputTranscription, true);
+                 this.currentInputTranscription = '';
+               }
+               if (this.currentOutputTranscription) {
+                 this.onTranscript('model', this.currentOutputTranscription, true);
+                 this.currentOutputTranscription = '';
+               }
+             }
+
              if (message.serverContent?.interrupted) {
                  this.stopCurrentAudio();
+                 // Reset transcriptions on interrupt if needed, usually cleaner to just clear
+                 this.currentOutputTranscription = '';
              }
           },
           onclose: () => {
@@ -240,9 +275,6 @@ export class LiveSessionManager {
   }
 
   disconnect() {
-    // There is no explicit disconnect method on the session object exposed in the prompt docs directly
-    // apart from potentially closing the promise context or just stopping local tracks.
-    // The prompt says "When the conversation is finished, use session.close()".
     if (this.sessionPromise) {
         this.sessionPromise.then(session => session.close());
     }
@@ -267,5 +299,7 @@ export class LiveSessionManager {
         this.outputAudioContext.close();
         this.outputAudioContext = null;
     }
+    this.currentInputTranscription = '';
+    this.currentOutputTranscription = '';
   }
 }

@@ -39,3 +39,10 @@ export interface LiveConnectionState {
   isConnecting: boolean;
   error: string | null;
 }
+
+export interface LiveTranscriptItem {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  isComplete: boolean;
+}
