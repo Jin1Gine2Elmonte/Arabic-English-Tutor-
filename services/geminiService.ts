@@ -7,9 +7,6 @@ const ai = new GoogleGenAI({ apiKey });
 
 // --- Chat Service ---
 export const createChatSession = (systemInstruction: string, useThinking: boolean = false) => {
-  // Use Pro for thinking, Flash for speed if not thinking.
-  // Although the prompt says "Use Pro for complex tasks", standard chat might default to Flash unless thinking is on.
-  // However, "AI powered chatbot" requirement specifies gemini-3-pro-preview.
   const model = 'gemini-3-pro-preview';
   
   const config: any = {
@@ -30,7 +27,6 @@ export const createChatSession = (systemInstruction: string, useThinking: boolea
 export const generateImage = async (config: ImageGenerationConfig): Promise<GeneratedImage> => {
   const model = 'gemini-3-pro-image-preview';
   
-  // The prompt requires using generateContent for this model, not generateImages
   const response = await ai.models.generateContent({
     model,
     contents: [{
@@ -92,7 +88,6 @@ export const generateSpeech = async (text: string, voice: TtsVoice): Promise<Aud
     1
   );
   
-  // Clean up context since we just want the buffer
   await audioContext.close();
   
   return audioBuffer;
@@ -100,7 +95,7 @@ export const generateSpeech = async (text: string, voice: TtsVoice): Promise<Aud
 
 // --- Transcription Service ---
 export const transcribeAudio = async (audioDataBase64: string, mimeType: string): Promise<string> => {
-  const model = "gemini-2.5-flash"; // Requirement
+  const model = "gemini-2.5-flash"; 
 
   const response = await ai.models.generateContent({
     model,
@@ -113,7 +108,7 @@ export const transcribeAudio = async (audioDataBase64: string, mimeType: string)
           }
         },
         {
-          text: "Please transcribe the audio exactly as spoken in English. If there are errors, transcribe the errors."
+          text: "Transcribe the following audio to text. If the audio is in English, write it in English. If it is in Arabic, write it in Arabic."
         }
       ]
     }]
@@ -155,6 +150,20 @@ export class LiveSessionManager {
       
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
+      // Updated System Instruction for Better Corrections
+      const systemInstruction = `
+      You are an expert English tutor for Arabic speakers. Your goal is to have a natural conversation.
+      
+      CRITICAL INSTRUCTION FOR CORRECTIONS:
+      If the user makes a grammar or pronunciation mistake, you must provide the correction wrapped in asterisks like this: *correction*.
+      
+      Example:
+      User: "I go to store yesterday."
+      Model: "You meant to say *I went to the store*. Past tense is used for yesterday. Where did you go?"
+      
+      Keep your responses concise, friendly, and helpful.
+      `;
+
       this.sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -164,7 +173,7 @@ export class LiveSessionManager {
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
-            systemInstruction: "You are a helpful, patient English tutor for an Arabic speaker. Speak clearly and simply. If the user makes pronunciation or grammar errors, gently correct them in your response. Ensure your response text is formatted clearly."
+            systemInstruction: systemInstruction
         },
         callbacks: {
           onopen: () => {
@@ -203,7 +212,6 @@ export class LiveSessionManager {
 
              if (message.serverContent?.interrupted) {
                  this.stopCurrentAudio();
-                 // Reset transcriptions on interrupt if needed, usually cleaner to just clear
                  this.currentOutputTranscription = '';
              }
           },
@@ -257,7 +265,7 @@ export class LiveSessionManager {
 
     const source = this.outputAudioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(this.outputAudioContext.destination); // Simple routing to destination
+    source.connect(this.outputAudioContext.destination);
     
     source.addEventListener('ended', () => {
         this.sources.delete(source);
