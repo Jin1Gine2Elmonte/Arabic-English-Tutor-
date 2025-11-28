@@ -33,9 +33,9 @@ export const generateImage = async (config: ImageGenerationConfig): Promise<Gene
   // The prompt requires using generateContent for this model, not generateImages
   const response = await ai.models.generateContent({
     model,
-    contents: {
+    contents: [{
       parts: [{ text: config.prompt }]
-    },
+    }],
     config: {
       imageConfig: {
         aspectRatio: config.aspectRatio,
@@ -104,7 +104,7 @@ export const transcribeAudio = async (audioDataBase64: string, mimeType: string)
 
   const response = await ai.models.generateContent({
     model,
-    contents: {
+    contents: [{
       parts: [
         {
           inlineData: {
@@ -116,7 +116,7 @@ export const transcribeAudio = async (audioDataBase64: string, mimeType: string)
           text: "Please transcribe the audio exactly as spoken in English. If there are errors, transcribe the errors."
         }
       ]
-    }
+    }]
   });
 
   return response.text || "";

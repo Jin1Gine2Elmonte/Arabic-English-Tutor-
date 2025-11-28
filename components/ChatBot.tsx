@@ -50,8 +50,8 @@ const ChatBot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await chatSessionRef.current.sendMessage(userMsg.text);
-      const responseText = result.response.text();
+      const result = await chatSessionRef.current.sendMessage({ message: userMsg.text });
+      const responseText = result.text;
       
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
