@@ -1,0 +1,7 @@
+{
+  "name": "Arabic English Tutor (المعلم الذكي)",
+  "description": "An AI-powered English learning application for Arabic speakers featuring real-time voice conversation, pronunciation coaching, and visual learning aids using Gemini models.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
